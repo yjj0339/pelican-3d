@@ -66,11 +66,25 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 260);
 
 // ---------- GLB 加载（直连失败/超时自动切 CDN 镜像） ----------
+// URL 白名单：只允许站内相对路径或下列 CDN 主机；跨域请求拒绝 localhost/回环/私有/保留地址
+const ALLOW_HOSTS = ['cdn.jsdelivr.net', 'fastly.jsdelivr.net'];
+const PRIVATE_HOST = /^(localhost|127\.|0\.0\.0\.0|\[?::1\]?|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.|\[?f[cd][0-9a-f]{2}:|\[?fe80:)/i;
+function safeAssetUrl(u) {
+  const abs = new URL(u, location.href);
+  if (abs.protocol !== 'http:' && abs.protocol !== 'https:') throw new Error('blocked protocol: ' + abs.protocol);
+  const host = abs.hostname.toLowerCase();
+  if (abs.origin === location.origin) return abs.href;      // 站内资源
+  if (ALLOW_HOSTS.indexOf(host) < 0) throw new Error('blocked host: ' + host);
+  if (PRIVATE_HOST.test(host)) throw new Error('blocked private host: ' + host);
+  return abs.href;
+}
 function fetchBuf(url, ms) {
   return new Promise((res, rej) => {
+    let safe;
+    try { safe = safeAssetUrl(url); } catch (e) { rej(e); return; }
     const ctl = new AbortController();
     const to = setTimeout(() => { ctl.abort(); rej(new Error('timeout')); }, ms);
-    fetch(url, { signal: ctl.signal })
+    fetch(safe, { signal: ctl.signal, credentials: 'omit', referrerPolicy: 'no-referrer' })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
       .then(b => { clearTimeout(to); res(b); })
       .catch(e => { clearTimeout(to); rej(e); });

@@ -24,5 +24,15 @@
   - 坑3：预览渲染时道具归位原点会污染 hero 镜头 → hero 期间挪 x=100
 - [x] Three.js 应用（world/rider/audio/main 四模块）三场景截图验收 + 线上手机验收通过
 - [x] 部署 https://yjj0339.github.io/pelican-3d/ （200 + JS/GLB MIME ✓ + 二维码 + 导航主页置顶卡片）
+- [x] 2026-09-24 用户反馈"一直加载不进去"→ 全链路加固（提交 789f874）：
+  - 体积：three 换 min 版（1.28MB→0.68MB）；首屏资源 4.4MB→2.1MB
+  - 渐进加载：鹈鹕+自行车就位即开跑，props.glb 后置补上（world.attachPropTemplates）
+  - 错误兜底：WebGL 检测 / 每步失败提示 / 20s 内联看门狗（不依赖主模块）/ 45s 超时重试 / 首帧成功自动恢复
+  - CDN 降级：直连 github.io 9s 超时 → cdn.jsdelivr.net → fastly.jsdelivr.net（GLB 走 fetch+parse，镜像带 CORS）
+  - 防旧缓存：index.html 引用 js/main.js?v=3（同网址此前部署过半成品）
+  - 移动端降质：DPR≤1.5、阴影 1024
+  - 实测（1.6Mbps 手机模拟）：首屏 22s→4.8s（线上）；三条失败路径 0.9~5.3s 内给出中文提示+重试
+  - 教训：r163+ 的 three 只支持 WebGL2，老设备/禁用 WebGL 会在 `new WebGLRenderer()` 抛错——此前无兜底=永久转圈
 - 注意：仓库里 tools/make_pelican.py、tools/shot-live.js 是前次中断会话遗留（已 gitignore）
 - 注意：analyze_image 工具按 URL 文件名缓存，复测要换新文件名；本地 server 端口 8912
+- 工具：tools/timing.js（慢网计时/--cdn/--nowebgl/--blockjs）、tools/diag-load.js（手机慢网复现）
