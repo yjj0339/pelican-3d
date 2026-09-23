@@ -18,4 +18,11 @@
 
 ## 进度
 - [x] 2026-09-23 立项，vendor 就位（three 0.170 单文件 + GLTFLoader 已改相对导入，免 importmap）
-- [ ] 建模 make_models.py（进行中）
+- [x] 2026-09-24 Blender 建模三轮验收通过（鹈鹕/自行车/15 道具 → 3 GLB）
+  - 坑1：keep 挂载读 matrix_world 前必须 view_layer.update()，否则双重位移
+  - 坑2：无头 EEVEE 渲染不出几何（只出背景）→ 预览用 Workbench/Cycles
+  - 坑3：预览渲染时道具归位原点会污染 hero 镜头 → hero 期间挪 x=100
+- [x] Three.js 应用（world/rider/audio/main 四模块）三场景截图验收 + 线上手机验收通过
+- [x] 部署 https://yjj0339.github.io/pelican-3d/ （200 + JS/GLB MIME ✓ + 二维码 + 导航主页置顶卡片）
+- 注意：仓库里 tools/make_pelican.py、tools/shot-live.js 是前次中断会话遗留（已 gitignore）
+- 注意：analyze_image 工具按 URL 文件名缓存，复测要换新文件名；本地 server 端口 8912
