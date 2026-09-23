@@ -1,4 +1,4 @@
-// 截图工具：node tools/shot.js [side|front|top|默认视角...]  或 node tools/shot.js mobile
+// 截图验收：node tools/shot.js [场景号...]  （需先 node serve.js）
 const path = require('path');
 const fs = require('fs');
 const puppeteer = require('E:/ZCODE/node_modules/puppeteer-core');
@@ -15,31 +15,33 @@ function findBrowser() {
 }
 
 (async () => {
-  const poses = process.argv.slice(2);
-  const list = poses.length ? poses : ['main'];
+  const scenes = process.argv.slice(2).map(Number);
+  const list = scenes.length ? scenes : [0, 1, 2];
   const browser = await puppeteer.launch({
     executablePath: findBrowser(),
     headless: 'new',
-    args: ['--use-angle=default', '--window-size=1280,760', '--hide-scrollbars'],
+    args: ['--use-angle=default', '--window-size=1280,800'],
   });
-  const page = await browser.newPage();
-  page.on('console', m => { if (m.type() === 'error') console.log('[console.error]', m.text()); });
-  page.on('pageerror', e => console.log('[pageerror]', e.message));
   fs.mkdirSync(path.join(__dirname, '..', 'shots'), { recursive: true });
-  for (const pos of list) {
-    const mobile = pos === 'mobile';
-    await page.setViewport({ width: mobile ? 390 : 1280, height: mobile ? 780 : 720, deviceScaleFactor: mobile ? 2 : 1 });
-    const q = ['main', 'mobile'].includes(pos) ? '' : `?cam=${pos}`;
-    await page.goto(`http://localhost:8912/${q}`, { waitUntil: 'domcontentloaded' });
-    try {
-      await page.waitForFunction('window.__ready === true', { timeout: 30000 });
-    } catch (e) {
-      console.log(pos, 'TIMEOUT waiting __ready');
+  for (const s of list) {
+    for (const [tag, w, h] of [['pc', 1280, 760], ['m', 390, 780]]) {
+      const page = await browser.newPage();
+      await page.setViewport({ width: w, height: h });
+      page.on('pageerror', e => console.log(`[pageerror s${s}${tag}]`, e.message));
+      page.on('console', m => { if (m.type() === 'error') console.log(`[console.error s${s}${tag}]`, m.text()); });
+      await page.goto(`http://localhost:8912/?scene=${s}&speed=${tag === 'pc' ? 6 : 5}`, { waitUntil: 'domcontentloaded' });
+      try {
+        await page.waitForFunction('window.__ready === true', { timeout: 25000 });
+      } catch (e) {
+        console.log(`s${s}${tag} TIMEOUT waiting __ready`);
+      }
+      await new Promise(r => setTimeout(r, s === 0 && tag === 'pc' ? 2600 : 1500));
+      const file = path.join(__dirname, '..', 'shots', `web_s${s}_${tag}.png`);
+      await page.screenshot({ path: file });
+      console.log('SHOT', file);
+      await page.close();
     }
-    await new Promise(r => setTimeout(r, 1500));
-    const file = path.join(__dirname, '..', 'shots', `${pos}.png`);
-    await page.screenshot({ path: file });
-    console.log('SHOT', file);
   }
   await browser.close();
-})();
+  console.log('ALL DONE');
+})().catch(e => { console.error(e); process.exit(1); });

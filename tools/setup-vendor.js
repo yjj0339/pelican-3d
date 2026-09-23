@@ -10,13 +10,14 @@ fs.mkdirSync(DST, { recursive: true });
 const jobs = [
   ['build/three.module.js', 'three.module.js'],
   ['examples/jsm/loaders/GLTFLoader.js', 'GLTFLoader.js'],
+  ['examples/jsm/utils/BufferGeometryUtils.js', 'BufferGeometryUtils.js'],
 ];
 
 for (const [rel, name] of jobs) {
   let text = fs.readFileSync(path.join(SRC, rel), 'utf8');
-  if (name === 'GLTFLoader.js') {
-    text = text.replace(/from 'three'/g, "from './three.module.js'");
-  }
+  text = text
+    .replace(/from 'three'/g, "from './three.module.js'")
+    .replace(/from '\.\.\/utils\/BufferGeometryUtils\.js'/g, "from './BufferGeometryUtils.js'");
   fs.writeFileSync(path.join(DST, name), text);
   console.log('vendor <-', name, (text.length / 1024).toFixed(0) + 'KB');
 }

@@ -5,3 +5,6 @@ models.blend
 models.blend1
 *.log
 .mimosa/
+tools/dbg404.js
+tools/shot-live.js
+tools/make_pelican.py
