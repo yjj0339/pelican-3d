@@ -1,0 +1,77 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; overflow: hidden; }
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  background: #eaf6ff;
+  touch-action: none;
+  -webkit-user-select: none; user-select: none;
+}
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* ---------- 加载页 ---------- */
+#loader {
+  position: absolute; inset: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, #bfe4ff 0%, #eaf7ff 55%, #fff6e8 100%);
+  transition: opacity .6s ease;
+}
+#loader.done { opacity: 0; pointer-events: none; }
+.load-card {
+  text-align: center;
+  background: rgba(255,255,255,.72);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 24px;
+  padding: 34px 46px;
+  box-shadow: 0 18px 50px rgba(90,140,190,.18);
+}
+.load-emoji { font-size: 54px; animation: bob 1.6s ease-in-out infinite; }
+@keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-9px) } }
+.load-title { font-size: 22px; font-weight: 700; color: #2b4a63; margin: 10px 0 16px; letter-spacing: 2px; }
+.load-bar { width: 210px; height: 8px; border-radius: 6px; background: rgba(70,120,170,.15); overflow: hidden; margin: 0 auto; }
+#loadFill { width: 5%; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #5cc8c0, #ffb75c); transition: width .25s ease; }
+.load-tip { margin-top: 12px; font-size: 13px; color: #6b8aa5; }
+
+/* ---------- HUD ---------- */
+#hud { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+.card {
+  position: absolute;
+  background: rgba(255,255,255,.66);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.85);
+  border-radius: 18px;
+  box-shadow: 0 8px 28px rgba(90,140,190,.14);
+  color: #2b4a63;
+}
+.title-card { top: 16px; left: 16px; padding: 12px 20px; }
+.title-card h1 { font-size: 19px; letter-spacing: 1px; }
+.title-card p { font-size: 11px; color: #7b96ad; margin-top: 3px; }
+.speed-card {
+  top: 16px; right: 16px; padding: 10px 18px;
+  display: flex; align-items: baseline; gap: 5px;
+}
+.speed-card span { font-size: 26px; font-weight: 800; color: #ff8a3d; font-variant-numeric: tabular-nums; }
+.speed-card small { font-size: 12px; color: #7b96ad; }
+.hint-card {
+  bottom: 18px; left: 50%; transform: translateX(-50%);
+  padding: 9px 18px; font-size: 12.5px; color: #587694;
+  white-space: nowrap;
+}
+
+/* ---------- 铃铛提示 ---------- */
+#toast {
+  position: absolute; top: 22%; left: 50%; transform: translate(-50%, -8px);
+  z-index: 11; padding: 8px 20px; border-radius: 999px;
+  background: rgba(255,255,255,.85); border: 1px solid #ffe1a8;
+  color: #e08a1e; font-size: 15px; font-weight: 700;
+  opacity: 0; pointer-events: none; transition: opacity .3s, transform .3s;
+  box-shadow: 0 8px 24px rgba(220,160,60,.22);
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 640px) {
+  .title-card h1 { font-size: 15px; }
+  .title-card p { display: none; }
+  .hint-card { font-size: 11px; padding: 7px 12px; bottom: 14px; }
+  .speed-card span { font-size: 21px; }
+}

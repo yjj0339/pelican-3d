@@ -1,0 +1,6 @@
+node_modules/
+shots/
+server.log
+models.blend
+models.blend1
+*.log

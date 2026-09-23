@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>鹈鹕兜风 3D · 海滨晨骑</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🦩</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+
+  <!-- 加载页 -->
+  <div id="loader">
+    <div class="load-card">
+      <div class="load-emoji">🦤</div>
+      <div class="load-title">鹈鹕兜风 3D</div>
+      <div class="load-bar"><div id="loadFill"></div></div>
+      <div class="load-tip" id="loadTip">正在给鹈鹕打气…</div>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="card title-card">
+      <h1>鹈鹕兜风 · 海滨晨骑</h1>
+      <p>Blender 手工建模 · Three.js 实时渲染</p>
+    </div>
+    <div class="card speed-card">
+      <span id="speed">0</span><small>km/h</small>
+    </div>
+    <div class="card hint-card">按住屏幕加速 · 拖动转视角 · 点鹈鹕摇铃铛</div>
+  </div>
+
+  <div id="toast">叮铃铃 ~</div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

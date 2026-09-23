@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-09-23T15:31:35.255Z",
+  "sessionId": "sess_319c0656-c03a-4d2d-b969-d6bdca864a1a",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "E:\\ZCODE\\pelican-3d\\tools\\make_pelican.py",
+  "outcome": "inconclusive",
+  "coverage": "partial",
+  "findingCount": 0,
+  "durationMs": 8,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}
