@@ -3,38 +3,70 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>鹈鹕兜风 3D · 海滨晨骑</title>
+<title>鹈鹕骑行 · 3D 立体环游</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🦩</text></svg>">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="app">
-  <canvas id="gl"></canvas>
+<canvas id="stage"></canvas>
 
-  <!-- 加载页 -->
-  <div id="loader">
-    <div class="load-card">
-      <div class="load-emoji">🦤</div>
-      <div class="load-title">鹈鹕兜风 3D</div>
-      <div class="load-bar"><div id="loadFill"></div></div>
-      <div class="load-tip" id="loadTip">正在给鹈鹕打气…</div>
-    </div>
+<!-- 加载页 -->
+<div id="loading">
+  <div class="load-card">
+    <div class="load-bird">🦩</div>
+    <div class="load-title">鹈鹕骑行 · 3D 立体环游</div>
+    <div class="load-bar"><i id="loadFill"></i></div>
+    <div class="load-tip" id="loadTip">正在给鹈鹕充气…</div>
   </div>
-
-  <!-- HUD -->
-  <div id="hud">
-    <div class="card title-card">
-      <h1>鹈鹕兜风 · 海滨晨骑</h1>
-      <p>Blender 手工建模 · Three.js 实时渲染</p>
-    </div>
-    <div class="card speed-card">
-      <span id="speed">0</span><small>km/h</small>
-    </div>
-    <div class="card hint-card">按住屏幕加速 · 拖动转视角 · 点鹈鹕摇铃铛</div>
-  </div>
-
-  <div id="toast">叮铃铃 ~</div>
 </div>
+
+<!-- 场景切换白闪 -->
+<div id="flash"></div>
+
+<!-- 顶部信息 -->
+<header id="hud-top">
+  <div class="hud-card">
+    <div class="hud-title">🦩 鹈鹕骑行 · 3D</div>
+    <div class="hud-row"><span id="hudScene">海岸晨风</span><span class="dot">·</span><span id="hudOdo">0.00 km</span></div>
+  </div>
+  <div class="hud-card speed-card">
+    <div class="speed-num"><b id="hudSpeed">0</b><i>km/h</i></div>
+    <input id="speedSlider" type="range" min="0" max="13" step="0.1" value="5.5">
+  </div>
+</header>
+
+<!-- 底部操作 -->
+<nav id="hud-bar">
+  <button class="btn" id="btnBell" title="车铃 (B)">🔔<span>车铃</span></button>
+  <button class="btn" id="btnGlide" title="滑翔 (按住空格)">🕊️<span>滑翔</span></button>
+  <button class="btn" id="btnCam" title="机位 (C)">🎬<span>机位</span></button>
+  <button class="btn" id="btnScene" title="场景 (1/2/3)">🌸<span>场景</span></button>
+  <button class="btn" id="btnSound" title="声音 (M)">🎵<span>声音</span></button>
+  <button class="btn" id="btnPhoto" title="拍照 (P)">📸<span>拍照</span></button>
+  <button class="btn" id="btnHelp" title="帮助 (H)">❓<span>帮助</span></button>
+</nav>
+
+<!-- 帮助 -->
+<div id="help" class="hidden">
+  <div class="help-card">
+    <h3>🦩 玩法</h3>
+    <ul>
+      <li><b>拖动画面</b>：转动镜头 · <b>滚轮 / 双指</b>：缩放</li>
+      <li><b>滑杆 / W S 键</b>：骑行速度</li>
+      <li><b>按住 滑翔 或 空格</b>：张开翅膀飞一段</li>
+      <li><b>车铃 B</b>：叮铃～（鹈鹕会张嘴回应）</li>
+      <li><b>机位 C</b>：跟拍 / 侧拍 / 迎面 / 航拍</li>
+      <li><b>场景 1 / 2 / 3</b>：海岸晨风 / 樱花原野 / 落日葵海</li>
+      <li><b>声音 M</b>：音乐+音效 / 仅音效 / 静音</li>
+      <li><b>拍照 P</b>：保存当前画面</li>
+    </ul>
+    <button class="btn ok" id="btnHelpClose">知道啦，出发！</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="sceneBanner">海岸晨风</div>
+
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
