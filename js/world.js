@@ -1,5 +1,5 @@
 // 世界模块：天空/海面/路面 Shader + 地形分块 + 道具布景 + 粒子 + 三大场景
-import * as THREE from '../vendor/three.module.js';
+import * as THREE from '../vendor/three.module.min.js';
 
 // ---------- 确定性随机 ----------
 let _seed = 20260923;
@@ -76,7 +76,7 @@ export function toonify(root, gradientMap) {
 export class World {
   constructor(scene, propTemplates, gradientMap) {
     this.scene = scene;
-    this.tpl = propTemplates;
+    this.tpl = propTemplates || null;      // 可后置注入（渐进加载）
     this.grad = gradientMap;
     this.sceneIndex = 0;
     this.scrollZ = 0;
@@ -88,10 +88,18 @@ export class World {
     this._buildRoad();
     this._buildSea();
     this._buildTerrain();
-    this._buildClouds();
+    if (this.tpl) this._buildClouds();
     this._buildPetals();
     this._buildSpeedLines();
     this.applyScene(0, true);
+  }
+
+  // 道具模板后置注入：重铺所有分块与云
+  attachPropTemplates(tpl) {
+    this.tpl = tpl;
+    this._buildClouds();
+    this.animNodes = [];
+    this.chunks.forEach((c, i) => this._populateChunk(c, i));
   }
 
   // ================= 天空 =================
@@ -274,6 +282,7 @@ export class World {
       if (p.pool) p.pool.push(p.obj);
     }
     chunk.props = [];
+    if (!this.tpl) return;                 // 道具还没到，先只跑地形
     const conf = SCENES[this.sceneIndex];
     const zBase = chunk.mesh.position.z;
     const add = (name, x, z, s, ry, y = 0) => {
@@ -349,7 +358,7 @@ export class World {
 
   // ================= 云 =================
   _buildClouds() {
-    const tpl = this.tpl['Cloud'];
+    const tpl = this.tpl && this.tpl['Cloud'];
     if (!tpl) return;
     for (let i = 0; i < 10; i++) {
       const obj = tpl.pool.length ? tpl.pool.pop() : tpl.proto.clone(true);

@@ -1,45 +1,115 @@
 // 鹈鹕骑行 · 3D 立体环游 — 主入口
 // Blender 建模 GLB + Three.js 卡通渲染 + 着色器世界 + WebAudio
-import * as THREE from '../vendor/three.module.js';
+// 加载策略：鹈鹕+自行车就位即开跑（首屏最快），沿途风光道具随后补上；
+// 全程错误兜底：WebGL 检测 / 每步失败提示 / 超时重试，绝不卡死在加载页。
+import * as THREE from '../vendor/three.module.min.js';
 import { GLTFLoader } from '../vendor/GLTFLoader.js';
 import { World, SCENES, makeGradientMap, buildTemplates } from './world.js';
-import { Rider, WHEEL_R } from './rider.js';
+import { Rider } from './rider.js';
 import { AudioEngine } from './audio.js';
 
 const QS = new URLSearchParams(location.search);
+const lowSpec = matchMedia('(pointer: coarse)').matches || innerWidth < 700;
+const $ = (id) => document.getElementById(id);
 
-// ---------- 渲染器 ----------
-const canvas = document.getElementById('stage');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
-const coarse = matchMedia('(pointer: coarse)').matches;
-renderer.setPixelRatio(Math.min(devicePixelRatio, coarse ? 1.8 : 2));
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.12;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// CDN 加速镜像（国内直连 github.io 慢/断时自动切换）
+const CDN_BASES = [
+  'https://cdn.jsdelivr.net/gh/yjj0339/pelican-3d@main/',
+  'https://fastly.jsdelivr.net/gh/yjj0339/pelican-3d@main/',
+];
+
+// ---------- 加载页 / 错误兜底 ----------
+let bootFailed = false;
+function setLoad(tip, pct) {
+  if (bootFailed) return;
+  if (tip) $('loadTip').textContent = tip;
+  if (pct != null) $('loadFill').style.width = pct + '%';
+}
+function hideLoading() {
+  window.__bootError = '';           // 若看门狗误报过，成功即恢复
+  $('loading').classList.add('done');
+}
+function bootError(msg, detail) {
+  bootFailed = true;
+  if (window.__clearWatchdogs) window.__clearWatchdogs();
+  window.__bootError = msg;
+  window.__ready = true;               // 让验收工具知道"已经结束（失败）"
+  const card = document.querySelector('#loading .load-card');
+  if (!card) return;
+  card.innerHTML =
+    '<div class="load-bird">🦩</div>' +
+    '<div class="load-title">没能加载出来</div>' +
+    '<div class="load-tip" style="margin-top:10px">' + msg + '</div>' +
+    (detail ? '<div class="load-tip" style="margin-top:6px;opacity:.72;font-size:11.5px">' + detail + '</div>' : '') +
+    '<button id="retryBtn" style="margin-top:16px;padding:10px 30px;border:0;border-radius:99px;background:#46c8b4;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer">重试</button>';
+  $('retryBtn').onclick = () => { location.href = location.pathname + '?r=' + Date.now(); };
+  $('loading').classList.remove('done');
+}
+
+// ---------- 渲染器（带 WebGL 检测） ----------
+const canvas = $('stage');
+let renderer = null;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, lowSpec ? 1.5 : 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.12;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+} catch (e) {
+  renderer = null;
+  console.error('WebGL init failed:', e);
+}
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 260);
 
-// ---------- 加载 ----------
-const loadFill = document.getElementById('loadFill');
-const loadTip = document.getElementById('loadTip');
-let loadedCount = 0;
-function tickLoad(tip) {
-  loadedCount++;
-  loadFill.style.width = Math.min(100, 8 + loadedCount / 3 * 90) + '%';
-  if (tip) loadTip.textContent = tip;
+// ---------- GLB 加载（直连失败/超时自动切 CDN 镜像） ----------
+function fetchBuf(url, ms) {
+  return new Promise((res, rej) => {
+    const ctl = new AbortController();
+    const to = setTimeout(() => { ctl.abort(); rej(new Error('timeout')); }, ms);
+    fetch(url, { signal: ctl.signal })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+      .then(b => { clearTimeout(to); res(b); })
+      .catch(e => { clearTimeout(to); rej(e); });
+  });
 }
-const loadGLB = (url) => new Promise((res, rej) => new GLTFLoader().load(url, res, undefined, rej));
+async function loadAssetBuffer(path) {
+  const forceCdn = !!QS.get('cdn');
+  const urls = forceCdn
+    ? CDN_BASES.map(b => b + path)
+    : [path].concat(CDN_BASES.map(b => b + path));
+  let lastErr = null;
+  for (let i = 0; i < urls.length; i++) {
+    const u = urls[i];
+    try {
+      return await fetchBuf(u, (i === 0 && !forceCdn) ? 9000 : 25000);
+    } catch (e) {
+      lastErr = e;
+      if (i === 0 && !forceCdn) setLoad('直连较慢，正在切换加速通道…', 30);
+    }
+  }
+  throw new Error('资源下载失败：' + path.split('/').pop() + '（' + (lastErr && lastErr.message) + '）');
+}
+async function loadGLB(path, tip) {
+  const buf = await loadAssetBuffer(path);
+  return new Promise((res, rej) => {
+    try {
+      new GLTFLoader().parse(buf, '', (g) => { if (tip) setLoad(tip); res(g); },
+        (e) => rej(new Error('模型解析失败：' + path.split('/').pop())));
+    } catch (e) { rej(e); }
+  });
+}
 
 // ---------- 状态 ----------
 const state = {
-  t: 0, speed: parseFloat(QS.get('speed') ?? '5.5'), crank: 0, odo: 0,
-  glideHold: false, glide: 0,             // glide 0..1 平滑
+  t: 0, speed: parseFloat(QS.get('speed') || '5.5'), crank: 0, odo: 0,
+  glideHold: false, glide: 0,
   bellAt: -9, jawOpen: 0, bellHead: 0, bellWag: 0,
   sceneIndex: 0, autoSceneAt: 42,
-  camMode: 0,                             // 0跟拍 1侧拍 2迎面 3航拍
+  camMode: 0,
   camAz: 0.42, camEl: 0.18, camR: 3.4,
   userOrbit: false,
   soundMode: 2,
@@ -51,7 +121,6 @@ const camTarget = new THREE.Vector3(0.05, 0.95, 0);
 function updateCamera(dt) {
   let az = state.camAz, el = state.camEl, r = state.camR;
   if (!state.userOrbit) {
-    // 机位预设的自动微动
     if (state.camMode === 0) az = 0.42 + Math.sin(state.t * 0.13) * 0.10;
     else if (state.camMode === 1) az = Math.PI / 2 + Math.sin(state.t * 0.09) * 0.04;
     else if (state.camMode === 2) az = Math.PI + Math.sin(state.t * 0.11) * 0.06;
@@ -91,7 +160,7 @@ canvas.addEventListener('pointermove', e => {
   if (!p) return;
   const dx = e.clientX - p.x, dy = e.clientY - p.y;
   p.x = e.clientX; p.y = e.clientY;
-  if (Math.hypot(e.clientX - downXY.x, e.clientY - downXY.y) > 9) state.userOrbit = true;
+  if (downXY && Math.hypot(e.clientX - downXY.x, e.clientY - downXY.y) > 9) state.userOrbit = true;
   if (pointers.size === 1) {
     state.camAz -= dx * 0.005;
     state.camEl = THREE.MathUtils.clamp(state.camEl + dy * 0.004, 0.04, 0.85);
@@ -118,7 +187,6 @@ canvas.addEventListener('wheel', e => {
 const audio = new AudioEngine();
 
 // ---------- HUD ----------
-const $ = (id) => document.getElementById(id);
 const toastEl = $('toast');
 let toastTimer = 0;
 function toast(msg) {
@@ -148,21 +216,22 @@ function switchScene(idx, manual = true) {
     audio.sceneKind = conf.id;
     $('hudScene').textContent = conf.name;
     showSceneBanner(conf.name);
-    if (conf.petals && Math.random() < 0.9) setTimeout(() => audio.chirp(), 900);
+    if (conf.petals) setTimeout(() => audio.chirp(), 900);
     state.autoSceneAt = state.t + 42;
     flash.classList.remove('on');
   }, 320);
   if (!manual) toast('前方到站：' + SCENES[((idx % 3) + 3) % 3].name);
 }
 function cycleSound() {
-  state.soundMode = (state.soundMode + 2) % 3; // 2 -> 0 -> 1 -> 2
-  audio.mode = state.soundMode === 1 ? 0 : state.soundMode; // 模式1=仅音效(无音乐)
-  audio.master && (audio.master.gain.value = state.soundMode === 0 ? 0 : 0.9);
+  state.soundMode = (state.soundMode + 2) % 3;   // 2 -> 0 -> 1 -> 2
+  audio.mode = state.soundMode === 1 ? 0 : state.soundMode;  // 1 = 仅音效（抑制音乐）
+  if (audio.master) audio.master.gain.value = state.soundMode === 0 ? 0 : 0.9;
   $('btnSound').classList.toggle('active', state.soundMode !== 0);
-  toast(['音乐+音效 🎵', '已静音 🔇', '仅音效 🔔'][(state.soundMode + 1) % 3] || '静音');
+  toast(['音乐+音效 🎵', '已静音 🔇', '仅音效 🔔'][(state.soundMode + 1) % 3]);
 }
 function takePhoto() {
-  audio.shutter && audio.shutter();
+  if (!renderer) return;
+  audio.shutter();
   renderer.render(scene, camera);
   const a = document.createElement('a');
   a.download = 'pelican-3d-' + Date.now() + '.png';
@@ -179,19 +248,15 @@ function setGlide(on) {
 $('btnBell').onclick = () => { audio.warm(); ringBell(); };
 $('btnGlide').onpointerdown = () => setGlide(true);
 $('btnGlide').onpointerup = $('btnGlide').onpointerleave = () => setGlide(false);
-$('btnCam').onclick = () => {
-  state.camMode = (state.camMode + 1) % 4;
-  state.userOrbit = false;
-  toast('机位：' + CAM_NAMES[state.camMode]);
-};
+$('btnCam').onclick = () => { state.camMode = (state.camMode + 1) % 4; state.userOrbit = false; toast('机位：' + CAM_NAMES[state.camMode]); };
 $('btnScene').onclick = () => switchScene(state.sceneIndex + 1);
 $('btnSound').onclick = () => { audio.warm(); cycleSound(); };
 $('btnPhoto').onclick = () => takePhoto();
 $('btnHelp').onclick = () => $('help').classList.remove('hidden');
 $('btnHelpClose').onclick = () => $('help').classList.add('hidden');
 $('speedSlider').oninput = (e) => { state.speed = parseFloat(e.target.value); };
+$('speedSlider').value = state.speed;
 
-// 键盘
 addEventListener('keydown', e => {
   if (e.repeat) return;
   audio.warm();
@@ -215,68 +280,73 @@ const speedEl = $('hudSpeed'), odoEl = $('hudOdo');
 
 // ---------- 主循环 ----------
 const clock = new THREE.Clock();
-let frames = 0, slowFrames = 0, degraded = false;
-let hudTimer = 0;
+let frames = 0, slowFrames = 0, degraded = false, hudTimer = 0, loopBroken = false;
 
 function animate() {
+  if (loopBroken || !renderer) return;
   requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
-  if (QS.get('still')) { /* 截图模式：时间冻结但渲染一帧 */ }
-  state.t += dt;
+  try {
+    const dt = Math.min(clock.getDelta(), 0.05);
+    state.t += dt;
 
-  // 滑翔平滑 + 速度
-  const glideT = state.glideHold ? 1 : 0;
-  state.glide += (glideT - state.glide) * Math.min(1, dt * 3.2);
-  const speed = state.speed * (1 + state.glide * 0.55);
-  state.crank += THREE.MathUtils.clamp(speed * 1.15, 1.2, 9.0) * dt * (state.speed > 0.15 ? 1 : 0);
-  state.odo += speed * dt;
+    const glideT = state.glideHold ? 1 : 0;
+    state.glide += (glideT - state.glide) * Math.min(1, dt * 3.2);
+    const speed = state.speed * (1 + state.glide * 0.55);
+    if (state.speed > 0.15) state.crank += THREE.MathUtils.clamp(speed * 1.15, 1.2, 9.0) * dt;
+    state.odo += speed * dt;
 
-  // 摇铃反应：张嘴 + 转头 + 摆尾
-  const since = state.t - state.bellAt;
-  if (since >= 0 && since < 1.4) {
-    const k = since / 1.4;
-    state.jawOpen = Math.sin(Math.min(1, k * 2.2) * Math.PI) * 0.9;
-    state.bellHead = Math.sin(Math.min(1, k * 1.6) * Math.PI) * 0.5;
-    state.bellWag = Math.sin(since * 14) * (1 - k) * 0.5;
-  } else if (state.glide > 0.5 && Math.sin(state.t * 2) > 0.96) {
-    state.jawOpen = 0.5;   // 滑翔开心叫
-  } else { state.jawOpen *= Math.max(0, 1 - dt * 6); state.bellHead = 0; state.bellWag = 0; }
+    const since = state.t - state.bellAt;
+    if (since >= 0 && since < 1.4) {
+      const k = since / 1.4;
+      state.jawOpen = Math.sin(Math.min(1, k * 2.2) * Math.PI) * 0.9;
+      state.bellHead = Math.sin(Math.min(1, k * 1.6) * Math.PI) * 0.5;
+      state.bellWag = Math.sin(since * 14) * (1 - k) * 0.5;
+    } else if (state.glide > 0.5 && Math.sin(state.t * 2) > 0.96) {
+      state.jawOpen = 0.5;
+    } else { state.jawOpen *= Math.max(0, 1 - dt * 6); state.bellHead = 0; state.bellWag = 0; }
 
-  if (world) world.update(dt, state.t, speed, state.glide);
-  if (rider) rider.update(dt, state.t, speed, state.crank, state);
-  updateCamera(dt);
-  audio.ambience(speed, dt);
+    if (world) world.update(dt, state.t, speed, state.glide);
+    if (rider) rider.update(dt, state.t, speed, state.crank, state);
+    updateCamera(dt);
+    audio.ambience(speed, dt);
 
-  // 自动换场景（未被 URL 禁用）
-  if (!QS.get('scene') && state.t > state.autoSceneAt) switchScene(state.sceneIndex + 1, false);
+    if (!QS.get('scene') && state.t > state.autoSceneAt) switchScene(state.sceneIndex + 1, false);
 
-  renderer.render(scene, camera);
+    renderer.render(scene, camera);
 
-  // HUD
-  hudTimer += dt;
-  if (hudTimer > 0.15) {
-    hudTimer = 0;
-    speedEl.textContent = Math.round(speed * 3.6);
-    odoEl.textContent = (state.odo / 1000).toFixed(2) + ' km';
-  }
-
-  // 性能降级
-  frames++;
-  if (!degraded && frames > 60) {
-    if (dt > 0.026) slowFrames++; else slowFrames = Math.max(0, slowFrames - 1);
-    if (slowFrames > 90) {
-      degraded = true;
-      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.3));
-      renderer.shadowMap.enabled = false;
-      scene.traverse(o => { if (o.isMesh && o.material) o.material.needsUpdate = true; });
-      console.log('quality degraded');
+    hudTimer += dt;
+    if (hudTimer > 0.15) {
+      hudTimer = 0;
+      speedEl.textContent = Math.round(speed * 3.6);
+      odoEl.textContent = (state.odo / 1000).toFixed(2) + ' km';
     }
+
+    frames++;
+    if (frames === 1) {
+      hideLoading();
+      if (window.__clearWatchdogs) window.__clearWatchdogs();
+      showSceneBanner(SCENES[state.sceneIndex].name);
+    }
+    if (frames === 3) window.__ready = true;
+
+    if (!degraded && frames > 60) {
+      if (dt > 0.026) slowFrames++; else slowFrames = Math.max(0, slowFrames - 1);
+      if (slowFrames > 90) {
+        degraded = true;
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 1.3));
+        renderer.shadowMap.enabled = false;
+        scene.traverse(o => { if (o.isMesh && o.material) o.material.needsUpdate = true; });
+      }
+    }
+  } catch (err) {
+    loopBroken = true;
+    bootError('画面渲染出错了', String(err && err.message ? err.message : err));
   }
-  if (frames === 3) window.__ready = true;
 }
 
 // ---------- 自适应 ----------
 function resize() {
+  if (!renderer) return;
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -286,33 +356,48 @@ addEventListener('resize', resize);
 // ---------- 启动 ----------
 (async () => {
   resize();
+  if (!renderer) {
+    bootError('这台设备没能启动 3D 画面（WebGL 不可用）', '试试更新浏览器，或在微信里点「…」→ 用系统浏览器打开');
+    return;
+  }
+  const wSlow = setTimeout(() => setLoad('网络有点慢，还在努力加载…', 55), 9000);
+  const wDead = setTimeout(() => bootError('加载超时了', '可能是网络较慢，点重试或稍后再打开'), 45000);
+  window.__clearWatchdogs = () => { clearTimeout(wSlow); clearTimeout(wDead); };
+
   try {
-    const [pelicanG, bikeG, propsG] = await Promise.all([
-      loadGLB('assets/pelican.glb').then(g => { tickLoad('鹈鹕上车…'); return g; }),
-      loadGLB('assets/bike.glb').then(g => { tickLoad('自行车充气…'); return g; }),
-      loadGLB('assets/props.glb').then(g => { tickLoad('布置沿途风光…'); return g; }),
+    // 第一步：主角就位就开跑（首屏最快）
+    const [pelicanG, bikeG] = await Promise.all([
+      loadGLB('assets/pelican.glb', '鹈鹕上车…'),
+      loadGLB('assets/bike.glb', '自行车充气…'),
     ]);
-    world = new World(scene, buildTemplates(propsG.scene, gradientMap), gradientMap);
+    setLoad('准备出发…', 82);
+
+    world = new World(scene, null, gradientMap);
+    if (lowSpec && world.sun) {
+      world.sun.shadow.mapSize.set(1024, 1024);
+      if (world.sun.shadow.map) { world.sun.shadow.map.dispose(); world.sun.shadow.map = null; }
+    }
     rider = new Rider(bikeG.scene, pelicanG.scene, gradientMap);
     scene.add(rider.root);
 
-    // URL 测试参数
-    if (QS.get('scene') !== null) { switchScene(parseInt(QS.get('scene')) || 0); }
-    else { const conf = SCENES[0]; $('hudScene').textContent = conf.name; audio.sceneKind = conf.id; }
+    if (QS.get('scene') !== null) switchScene(parseInt(QS.get('scene')) || 0);
+    else { $('hudScene').textContent = SCENES[0].name; audio.sceneKind = SCENES[0].id; }
     if (QS.get('cam')) {
       const i = ['follow', 'side', 'front', 'top'].indexOf(QS.get('cam'));
       if (i >= 0) state.camMode = i;
     }
-    if (QS.get('auto')) { /* 自动运镜演示用 */ }
 
     audio.startMusic();
-    loadFill.style.width = '100%';
-    loadTip.textContent = '出发！';
-    setTimeout(() => { document.getElementById('loading').classList.add('done'); showSceneBanner(SCENES[state.sceneIndex].name); }, 420);
+    animate();                        // 首帧渲染后自动收起加载页
+
+    // 第二步：沿途风光随后补上（不阻塞首屏）
+    setLoad('正在布置沿途风光…', 90);
+    const propsG = await loadGLB('assets/props.glb');
+    world.attachPropTemplates(buildTemplates(propsG.scene, gradientMap));
+    setLoad('出发！', 100);
+    window.__propsReady = true;
+    if (window.__clearWatchdogs) window.__clearWatchdogs();
   } catch (err) {
-    loadTip.textContent = '加载失败：' + err.message;
-    console.error(err);
-    window.__ready = true;
+    bootError(String(err && err.message ? err.message : err), '点重试重新加载；若一直失败请稍后再试');
   }
-  animate();
 })();

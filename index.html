@@ -67,6 +67,29 @@
 <div id="toast"></div>
 <div id="sceneBanner">海岸晨风</div>
 
-<script type="module" src="js/main.js"></script>
+<script>
+// 兜底看门狗（纯 JS，不依赖主模块）：即使脚本没能加载/浏览器不支持，也必须在 20 秒内给出提示，绝不无限转圈
+(function () {
+  function fail(msg, detail) {
+    if (window.__ready || window.__bootError) return;
+    window.__bootError = msg;
+    var card = document.querySelector('#loading .load-card');
+    if (!card) return;
+    card.innerHTML = '<div class="load-bird">🦩</div><div class="load-title">没能加载出来</div>' +
+      '<div class="load-tip" style="margin-top:10px">' + msg + '</div>' +
+      (detail ? '<div class="load-tip" style="margin-top:6px;opacity:.72;font-size:11.5px">' + detail + '</div>' : '') +
+      '<button id="retryBtn" style="margin-top:16px;padding:10px 30px;border:0;border-radius:99px;background:#46c8b4;color:#fff;font-size:15px;font-weight:700;font-family:inherit">重试</button>';
+    var b = document.getElementById('retryBtn');
+    if (b) b.onclick = function () { location.href = location.pathname + '?r=' + Date.now(); };
+    var l = document.getElementById('loading');
+    if (l) l.classList.remove('done');
+  }
+  window.addEventListener('error', function (e) {
+    if (e && e.target && e.target.tagName === 'SCRIPT') fail('脚本没能加载', '网络不畅或浏览器版本偏旧，点重试');
+  }, true);
+  setTimeout(function () { fail('加载超时了', '可能是网络较慢，点重试，或换个网络（如开关一下流量）再试'); }, 20000);
+})();
+</script>
+<script type="module" src="js/main.js?v=3"></script>
 </body>
 </html>

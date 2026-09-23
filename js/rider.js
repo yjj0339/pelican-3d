@@ -1,5 +1,5 @@
 // 骑手模块：鹈鹕 + 自行车装配与动画（踩踏 IK / 翅膀 / 围巾 / 喙 / 滑翔）
-import * as THREE from '../vendor/three.module.js';
+import * as THREE from '../vendor/three.module.min.js';
 
 // 与 Blender 建模一致的常量（游戏坐标 = glTF 坐标）
 export const WHEEL_R = 0.34;

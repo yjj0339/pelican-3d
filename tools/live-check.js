@@ -30,10 +30,12 @@ const BASE = 'https://yjj0339.github.io/pelican-3d/';
     page.on('console', m => { if (m.type() === 'error') console.log(`[console.error ${tag}]`, m.text()); });
     await page.goto(`${BASE}?scene=${scene}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     try {
-      await page.waitForFunction('window.__ready === true', { timeout: 30000 });
+      await page.waitForFunction('window.__propsReady === true || window.__bootError', { timeout: 45000 });
     } catch (e) {
       console.log(`${tag} TIMEOUT`);
     }
+    const bootErr = await page.evaluate('window.__bootError || ""');
+    if (bootErr) console.log(`${tag} BOOT ERROR:`, bootErr);
     await new Promise(r => setTimeout(r, 2200));
     const file = path.join(__dirname, '..', 'shots', `live_${tag}.png`);
     await page.screenshot({ path: file });

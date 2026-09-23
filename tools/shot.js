@@ -31,10 +31,12 @@ function findBrowser() {
       page.on('console', m => { if (m.type() === 'error') console.log(`[console.error s${s}${tag}]`, m.text()); });
       await page.goto(`http://localhost:8912/?scene=${s}&speed=${tag === 'pc' ? 6 : 5}`, { waitUntil: 'domcontentloaded' });
       try {
-        await page.waitForFunction('window.__ready === true', { timeout: 25000 });
+        await page.waitForFunction('window.__propsReady === true || window.__bootError', { timeout: 40000 });
       } catch (e) {
-        console.log(`s${s}${tag} TIMEOUT waiting __ready`);
+        console.log(`s${s}${tag} TIMEOUT waiting __propsReady`);
       }
+      const bootErr = await page.evaluate('window.__bootError || ""');
+      if (bootErr) console.log(`s${s}${tag} BOOT ERROR:`, bootErr);
       await new Promise(r => setTimeout(r, s === 0 && tag === 'pc' ? 2600 : 1500));
       const file = path.join(__dirname, '..', 'shots', `web_s${s}_${tag}.png`);
       await page.screenshot({ path: file });
